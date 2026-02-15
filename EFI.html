@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>App-DOR Recovery V: 0.0.3</title>
+<style>
+body {
+    background-color: black;
+    color: #ffffff;
+    font-family: "Courier New", monospace;
+    margin: 0;
+    padding: 20px;
+}
+#screen {
+    max-width: 600px;
+}
+.option { 
+    cursor: pointer;
+    outline: none;
+    padding: 0 2px;
+}
+.option:hover, .option:focus { 
+    background-color: #00ff00; 
+    color: black; 
+    border-radius: 2px;
+}
+.hidden { display: none; }
+input { 
+    background: black; 
+    color: #ffffff; 
+    border: none; 
+    outline: none; 
+    font-family: inherit; 
+    font-size: 16px; 
+}
+#message { color: #eed202; }
+
+.warning {
+    color: #eed202;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+.warning-option {
+    color: #eed202;
+}
+.critical {
+    color: #D0342C;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+@keyframes blink {
+    0%   { opacity: 1; }
+    50%  { opacity: 0; }
+    100% { opacity: 1; }
+}
+.blink {
+    animation: blink 1s step-start infinite;
+}
+.invisible { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+    .blink {
+        animation: none;
+    }
+}
+
+/* Boot / crash UI styles (used when booting in-place) */
+.boot-output { margin-top: 12px; white-space: pre; font-size: 16px; color: #9aa; }
+.boot-success { color: #6ff; }
+.crash-wrap { text-align: center; margin-top: 24px; display: none; }
+.crash-title { color: #D0342C; font-weight: bold; font-size: 18px; }
+.crash-warning { color: #eed202; display:inline-block; margin-top:8px; }
+
+/* OS Boot Screen (splash screen with logo) */
+#osBootScreen {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+    z-index: 9999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+#osBootScreen.show {
+    display: flex;
+}
+.os-logo-container {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.os-logo {
+    max-width: 400px;
+    max-height: 300px;
+    width: auto;
+    height: auto;
+    margin-bottom: 20px;
+}
+.os-boot-text {
+    color: #eed202;
+    font-size: 18px;
+    margin-top: 20px;
+    text-align: center;
+}
+.os-loading-bar {
+    width: 300px;
+    height: 20px;
+    border: 2px solid #00ff00;
+    margin-top: 30px;
+    position: relative;
+    overflow: hidden;
+}
+.os-loading-fill {
+    height: 100%;
+    background-color: #00ff00;
+    width: 0%;
+    animation: loading 3s ease-in-out forwards;
+}
+@keyframes loading {
+    0% { width: 0%; }
+    50% { width: 60%; }
+    100% { width: 100%; }
+}
+
+/* Transition Screen (before redirect to website) */
+#transitionScreen {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+    z-index: 9998;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+#transitionScreen.show {
+    display: flex;
+}
+.transition-container {
+    text-align: center;
+}
+.transition-logo {
+    max-width: 300px;
+    max-height: 250px;
+    width: auto;
+    height: auto;
+    margin-bottom: 30px;
+    opacity: 0;
+    animation: fadeInTransition 1s ease-in-out forwards;
+}
+.transition-text {
+    color: #00ff00;
+    font-size: 20px;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeInTransition 1.5s ease-in-out forwards;
+}
+.transition-status {
+    color: #eed202;
+    font-size: 16px;
+    margin-top: 20px;
+    opacity: 0;
+    animation: fadeInTransition 2s ease-in-out forwards;
+}
+.transition-loading {
+    width: 300px;
+    height: 20px;
+    border: 2px solid #00ff00;
+    margin-top: 30px;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeInTransition 2.5s ease-in-out forwards;
+}
+.transition-loading-fill {
+    height: 100%;
+    background-color: #00ff00;
+    width: 0%;
+    animation: transitionLoading 4s ease-in-out forwards;
+}
+@keyframes fadeInTransition {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes transitionLoading {
+    0% { width: 0%; }
+    70% { width: 85%; }
+    100% { width: 100%; }
+}
+</style>
+</head>
+<body>
+<!-- OS Boot Screen (splash screen) -->
+<div id="osBootScreen">
+    <div class="os-logo-container">
+        <img src="C:\Users\Robert\Downloads\App-DOR\App-DOR Boot Loader.png" alt="App-DOR OS Logo" class="os-logo" id="osLogo">
+        <div class="os-boot-text">App-DOR</div>
+        <span class="critical blink">Boot Failed! Booting into Recovery...</span>
+        </div>
+        <div class="os-boot-text" style="font-size: 14px; margin-top: 20px;">Initializing System...</div>
+    </div>
+</div>
+
+
+<!-- Transition Screen (before redirect to website) -->
+<div id="transitionScreen">
+    <div class="transition-container">
+        <img src="C:\Users\Robert\Downloads\App-DOR\App-DOR Boot Loader.png" alt="App-DOR Logo" class="transition-logo" id="transitionLogo">
+        <div class="transition-text">Loading App-DOR Desktop</div>
+        <div class="transition-status">Establishing Connection...</div>
+        <div class="transition-loading">
+            <div class="transition-loading-fill"></div>
+        </div>
+        <div class="transition-status" style="margin-top: 40px; font-size: 12px;">Please wait while we connect you to the App-DOR application.</div>
+    </div>
+</div>
+
+<div id="screen">
+<pre id="mainPre">
+==============================================================
+                    App-DOR Recovery V: 0.0.3
+==============================================================
+
+=============================================================================================================================================================================================================
+<span class="warning">This Version Of App-DOR Is A SCHOOL VERSION! Meaning That This OS Is Made For School Use. Age Restricted Websites Are Built-in. As this is in DEV-BETA. Please get a copy from developer for non-school use.</span>
+=============================================================================================================================================================================================================
+<span class="critical blink">Please read the warning above carefully before choosing an option.</span>
+=============================================================================================================================================================================================================
+<span class="option" data-menu="main" data-choice="1" tabindex="0">1. Understand Warning And Boot</span>
+<span class="option" data-menu="main" data-choice="2" tabindex="0">2. Exit</span>
+=============================================================================================================================================================================================================
+
+Pick from 1 - 2.
+</pre>
+
+<input type="text" id="input" maxlength="1" autofocus aria-label="Menu selection (1 or 2)">
+
+<pre id="message"></pre>
+</div>
+
+<!-- reuse the same submenu options for recovery choices -->
+<span class="option hidden" data-menu="submenu" data-choice="1" tabindex="0">1. Agree And Boot</span>
+<span class="option hidden" data-menu="submenu" data-choice="2" tabindex="0">2. Exit</span>
+
+<script>
+/*
+Detailed plan implemented in JS:
+- MAIN_SITE constant holds the URL to open.
+- Cookie helpers `setCookie`, `getCookie` and `hasAgreed`.
+- `showSubMenu` now skips if `hasAgreed()` is true and starts `performBoot` with skipCrash.
+- `performBoot(mode, opts)`:
+    - If skipCrash -> perform regular boot sequence and redirect current window.
+    - Else -> open MAIN_SITE in a new tab, then simulate a critical error locally but automatically
+      stop showing the failed state after a short pause and then start recovery boot automatically.
+- `handleChoice` still supports manual recovery choice; automated flow will attempt recovery after the error pause.
+- Added short pauses (await sleep(...)) in `init()` and in `bootSuccess()` to ensure a visible pause before moving to next scene.
+*/
+
+const MAIN_SITE = 'https://adorable-ophelie-appdor-50b16a71.koyeb.app/';
+
+const screen = document.getElementById("screen");
+const mainPre = document.getElementById("mainPre");
+const input = document.getElementById("input");
+const message = document.getElementById("message");
+const osBootScreen = document.getElementById("osBootScreen");
+const transitionScreen = document.getElementById("transitionScreen");
+const optionEls = Array.from(document.querySelectorAll(".option"));
+const blinkEls = Array.from(document.querySelectorAll(".blink"));
+let currentMenu = "main";
+
+const originalPreVisibility = mainPre.style.visibility || '';
+const originalPreHeight = mainPre.style.height || '';
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function setCookie(name, value, days) {
+    try {
+        const d = new Date();
+        d.setTime(d.getTime() + (days*24*60*60*1000));
+        const expires = "expires=" + d.toUTCString();
+        document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/";
+    } catch (e) {
+        try { localStorage.setItem(name, value); } catch (e2) { /* ignore */ }
+    }
+}
+function getCookie(name) {
+    try {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
+    } catch (e) { /* ignore */ }
+    try { return localStorage.getItem(name); } catch (e) { return null; }
+}
+function hasAgreed() {
+    const v = getCookie('appdor_agreed');
+    return v === '1' || v === 'true';
+}
+
+function clearScreen() {
+    mainPre.style.visibility = 'hidden';
+    mainPre.style.height = '1.2em';
+    message.textContent = '';
+    message.className = '';
+}
+
+function restoreScreen() {
+    mainPre.style.visibility = originalPreVisibility;
+    mainPre.style.height = originalPreHeight;
+}
+
+function updateOptionVisibility() {
+    optionEls.forEach(el => {
+        const menu = el.dataset.menu || "main";
+        if (menu === currentMenu) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+}
+
+function focusFirstVisibleOption() {
+    const first = optionEls.find(el => !el.classList.contains('hidden'));
+    if (first) {
+        try { first.focus(); } catch (e) { /* ignore */ }
+    } else {
+        try { input.focus(); } catch (e) { /* ignore */ }
+    }
+}
+
+function showMessage(msg, classes) {
+    message.textContent = msg;
+    if (Array.isArray(classes) && classes.length) {
+        message.className = classes.join(' ');
+    } else {
+        message.className = '';
+    }
+}
+
+// Show the OS boot screen on page load
+function showOSBootScreen() {
+    return new Promise((resolve) => {
+        osBootScreen.classList.add('show');
+        // Wait for loading bar animation to complete (3 seconds)
+        setTimeout(() => {
+            osBootScreen.classList.remove('show');
+            resolve();
+        }, 3000);
+    });
+}
+
+// Show the transition screen before redirecting to the website
+function showTransitionScreen() {
+    return new Promise((resolve) => {
+        transitionScreen.classList.add('show');
+        // Wait for transition loading bar animation to complete (~4 seconds)
+        setTimeout(() => {
+            transitionScreen.classList.remove('show');
+            resolve();
+        }, 4500);
+    });
+}
+
+function showMainMenu() {
+    currentMenu = "main";
+    restoreScreen();
+    input.disabled = false;
+    updateOptionVisibility();
+    showMessage("");
+    focusFirstVisibleOption();
+}
+
+function showSubMenu() {
+    // If they already agreed previously (cookie present) skip recovery flow
+    if (hasAgreed()) {
+        performBoot("normal", { skipCrash: true });
+        return;
+    }
+    currentMenu = "submenu";
+    clearScreen();
+    input.disabled = true;
+    updateOptionVisibility();
+    showMessage("Do you want to Agree? This Will Not Be Reversable Unless Cookies Are Removed! 1 = Agree And Boot, 2 = Exit");
+    focusFirstVisibleOption();
+}
+
+function showHaltedMessage() {
+    showMessage("System Failed To Agree, The System Is Now Halted. To Continue, Please Refresh Your Page.");
+    focusFirstVisibleOption();
+}
+
+// performBoot runs an in-place boot sequence and then shows transition screen before redirect.
+// If opts.skipCrash === true -> proceed normally and redirect current window.
+// If opts.skipCrash is falsy -> open MAIN_SITE in a new tab, then simulate a critical error locally and enter recovery.
+// Updated behavior: after showing critical error briefly, automatically stop showing the failure and start recovery boot.
+function performBoot(mode, opts = {}) {
+    if (currentMenu === 'boot' || currentMenu === 'crash') return;
+    // If already agreed, force skipCrash
+    if (hasAgreed()) opts.skipCrash = true;
+
+    if (opts.skipCrash) {
+        // Normal boot flow: show local boot lines then redirect current window to MAIN_SITE
+        currentMenu = 'boot';
+        clearScreen();
+        updateOptionVisibility();
+
+        try { input.blur(); } catch (e) { /* ignore */ }
+        input.disabled = true;
+
+        const bootContainer = document.createElement('div');
+        bootContainer.id = 'bootContainer';
+
+        const headerLines = document.createElement('div');
+        headerLines.className = 'boot-output';
+        headerLines.innerText = '==============================================================\n                     App-DOR Boot Sequence\n==============================================================\n';
+        bootContainer.appendChild(headerLines);
+
+        const output = document.createElement('div');
+        output.className = 'boot-output';
+        bootContainer.appendChild(output);
+
+        screen.appendChild(bootContainer);
+        window.scrollTo(0, document.body.scrollHeight);
+
+        const steps = [
+            'Boot loader: version 0.0.3',
+            'Mode: ' + (mode || 'normal'),
+            'Initializing core modules...',
+            'Mounting virtual filesystems...',
+            'Loading security policies...',
+            'Starting desktop environment...',
+            'Finalizing startup...'
+        ];
+
+        function writeLine(text, cls) {
+            const el = document.createElement('div');
+            el.className = 'boot-output' + (cls ? ' ' + cls : '');
+            el.textContent = text;
+            output.appendChild(el);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        let idx = 0;
+        function nextStep() {
+            if (idx < steps.length) {
+                writeLine(steps[idx], 'boot-output');
+                idx++;
+                setTimeout(nextStep, 350 + Math.random() * 300);
+            } else {
+                writeLine('System startup complete. Handing over to user session...', 'boot-success');
+                setTimeout(bootSuccess, 700);
+            }
+        }
+
+        async function bootSuccess() {
+            writeLine('System startup complete. Handing over to user session...', 'boot-success');
+            await sleep(1000);
+            // Show transition screen before redirecting (current window)
+            await showTransitionScreen();
+            // Add a short pause to separate transition from redirect
+            await sleep(400);
+            // Redirect current window
+            window.location.replace(MAIN_SITE);
+        }
+
+        writeLine('Starting boot sequence...', 'boot-output');
+        setTimeout(nextStep, 300);
+        return;
+    }
+
+    // Non-skipCrash flow: attempt to open main site first (new tab), then crash locally and present recovery choices
+    try { input.blur(); } catch (e) { /* ignore */ }
+    input.disabled = true;
+
+    // Open main site in a new tab/window (this attempts to "make the boot at main website open")
+    try {
+        window.open(MAIN_SITE, '_blank');
+    } catch (e) {
+        // popups blocked or error - continue to show critical error locally
+        console.warn('Could not open new tab for MAIN_SITE', e);
+    }
+
+    // Simulate a critical error and enter a short failure display, then automatically start recovery boot.
+    currentMenu = 'crash';
+    clearScreen();
+    updateOptionVisibility();
+    // Show a clear critical error message instructing the user to recover (Agree) or Exit
+    showMessage("CRITICAL ERROR: Kernel panic during external handoff.\nThe external session opened but failed to connect the desktop here.\nAttempting automated recovery shortly...", ['critical', 'blink']);
+
+    // After a short pause stop showing the persistent failure and automatically start recovery boot.
+    (async () => {
+        // Keep the critical message visible for a few seconds so the user can read it.
+        await sleep(3500);
+
+        // Replace message with recovery notice and remove blink so it doesn't keep saying "failed".
+        showMessage("Stopping failed state. Initiating recovery boot...", ['boot-success']);
+        // Small pause for readability.
+        await sleep(900);
+
+        // Start recovery boot flow which uses skipCrash to complete the boot here and redirect.
+        performBoot("recovery", { skipCrash: true });
+    })();
+}
+
+async function handleChoice(choice) {
+    const c = String(choice || "").trim();
+    if (currentMenu === "main") {
+        switch (c) {
+            case "1":
+                showSubMenu();
+                break;
+            case "2":
+                showHaltedMessage();
+                break;
+            default:
+                showMessage("Invalid selection. System Halted! To Continue, Please Refresh Your Page.");
+                break;
+        }
+    } else if (currentMenu === "submenu") {
+        switch (c) {
+            case "1":
+                // User agrees to recover and boot. Save cookie so we skip next time.
+                try { setCookie('appdor_agreed', '1', 365); } catch (e) { /* ignore */ }
+                try { localStorage.setItem('appdor_agreed', '1'); } catch (e) { /* ignore */ }
+                // Proceed to boot and skip crash path
+                performBoot("normal", { skipCrash: true });
+                break;
+            case "2":
+                showHaltedMessage();
+                break;
+            default:
+                showMessage("Invalid selection in submenu. Press 2 to exit.");
+                break;
+        }
+    } else if (currentMenu === 'boot' || currentMenu === 'crash') {
+        showMessage("System is booting or crashed. Refresh the page to restart.");
+    } else {
+        showMessage("Unknown menu state.");
+    }
+}
+
+optionEls.forEach(el => {
+    el.addEventListener("click", () => {
+        if ((el.dataset.menu || "main") !== currentMenu) return;
+        handleChoice(el.dataset.choice);
+    });
+    el.addEventListener("keydown", (e) => {
+        if ((el.dataset.menu || "main") !== currentMenu) return;
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleChoice(el.dataset.choice);
+        }
+    });
+});
+
+input.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        const val = input.value;
+        input.value = "";
+        handleChoice(val);
+    }
+});
+
+document.addEventListener("keydown", function(event) {
+    if (document.activeElement === input) return;
+    if (["1","2","3"].includes(event.key)) {
+        event.preventDefault();
+        handleChoice(event.key);
+    }
+});
+
+// Initialize: show OS boot screen, then main menu
+(async function init() {
+    await showOSBootScreen();
+    // Pause briefly before moving to the main menu for clearer scene separation
+    await sleep(400);
+    updateOptionVisibility();
+    await sleep(200);
+    showMainMenu();
+})();
+
+(function jsBlinkFallback() {
+    try {
+        if (typeof CSS === 'undefined' || !CSS.supports || !CSS.supports('animation-name', 'blink')) {
+            setInterval(() => {
+                blinkEls.forEach(el => el.classList.toggle('invisible'));
+            }, 500);
+        }
+    } catch (e) {
+        console.warn('Blink fallback unavailable', e);
+    }
+})();
+</script>
+</body>
+</html>
